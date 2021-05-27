@@ -1,4 +1,3 @@
-##shell
+## shell
 
-        A basic UNIX -
-    like shell.
+A basic UNIX-like shell.
