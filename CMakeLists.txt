@@ -33,7 +33,7 @@ find_package(fmt)
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
-find_package(Boost REQUIRED COMPONENTS)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 
 if(Boost_FOUND)
     list(APPEND CXX_INCLUDE_DIRS ${Boost_INCLUDE_DIRS})

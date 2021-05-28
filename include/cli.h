@@ -6,7 +6,13 @@
 #include <functional>
 #include <system_error>
 
+#include "boost/filesystem.hpp"
+
 using ErrorCode = std::error_code;
+
+namespace Cli
+{
+namespace bf = boost::filesystem;
 
 class Cli
 {
@@ -16,17 +22,20 @@ class Cli
 private:
     ErrorCode cd(const std::vector<std::string>& args);
     ErrorCode exit(const std::vector<std::string>& args);
+    ErrorCode clear(const std::vector<std::string>& args);
 
 public:
     Cli(std::string_view username, std::string_view machine_name,
         std::string_view directory = "~/")
-        : m_prev_command_result(0, std::generic_category())
+        : m_path{"/bin", "/usr/bin"}
+        , m_prev_command_result(0, std::generic_category())
         , m_directory(directory)
         , m_username(username)
         , m_machine_name(machine_name)
     {
         m_builtin_commands.emplace("cd", &Cli::cd);
         m_builtin_commands.emplace("exit", &Cli::exit);
+        m_builtin_commands.emplace("clear", &Cli::clear);
     }
 
     ErrorCode run();
@@ -34,13 +43,21 @@ public:
 private:
     ErrorCode execute(const std::string& command);
 
-    [[nodiscard]] std::string advance() const;
-    void print_interface() const;
+    inline void print_interface() const;
 
+    std::vector<bf::path> m_path;
     ErrorCode m_prev_command_result;
     std::string m_directory;
     const std::string m_username;
     const std::string m_machine_name;
 
+    bool m_running = true;
+
     std::unordered_map<std::string, Command> m_builtin_commands;
 };
+
+inline ErrorCode success();
+inline ErrorCode failure();
+inline std::string advance();
+
+}

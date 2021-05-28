@@ -2,7 +2,7 @@
 
 int main()
 {
-    Cli cli{"azamat", "aza_machine"};
+    Cli::Cli cli{"azamat", "aza_machine"};
 
     return cli.run().value();
 }
