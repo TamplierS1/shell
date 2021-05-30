@@ -12,6 +12,7 @@ add_subdirectory(src)
 set(CXX_COMPILE_FLAGS)
 set(CXX_LINK_FLAGS)
 list(APPEND CXX_COMPILE_FLAGS -Wall -Wextra -pedantic -Wno-narrowing -Wno-sign-compare)
+list(APPEND CXX_LINK_FLAGS -fuse-ld=gold )
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     list(APPEND CXX_COMPILE_FLAGS -fno-omit-frame-pointer

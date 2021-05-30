@@ -14,6 +14,11 @@ namespace Cli
 {
 namespace bf = boost::filesystem;
 
+// TODO: add environment variables (and maybe implement a parser for the commands).
+// TODO: add history.
+// TODO: add `echo` command (impossible without adding variables).
+// TODO: add customisable user and machine name.
+
 class Cli
 {
     // Returns `err_c` and takes `std::vector<std::string>&` as an argument.
@@ -23,6 +28,8 @@ private:
     ErrorCode cd(const std::vector<std::string>& args);
     ErrorCode exit(const std::vector<std::string>& args);
     ErrorCode clear(const std::vector<std::string>& args);
+    // Takes the directory names you want to add to the path variable.
+    ErrorCode path(const std::vector<std::string>& args);
 
 public:
     Cli(std::string_view username, std::string_view machine_name,
@@ -32,16 +39,24 @@ public:
         , m_directory(directory)
         , m_username(username)
         , m_machine_name(machine_name)
+        , m_builtin_commands{{"cd", &Cli::cd},
+                             {"exit", &Cli::exit},
+                             {"clear", &Cli::clear},
+                             {"path", &Cli::path}}
     {
-        m_builtin_commands.emplace("cd", &Cli::cd);
-        m_builtin_commands.emplace("exit", &Cli::exit);
-        m_builtin_commands.emplace("clear", &Cli::clear);
     }
 
     ErrorCode run();
 
 private:
     ErrorCode execute(const std::string& command);
+    ErrorCode run_to_stdout(const std::string& binary,
+                            const std::vector<std::string>& args);
+    ErrorCode run_to_file(const std::string& binary, const std::vector<std::string>& args,
+                          const std::string& filename);
+    ErrorCode run_to_process(const std::string& binary,
+                             const std::vector<std::string>& args,
+                             const std::string& command);
 
     inline void print_interface() const;
 
@@ -50,6 +65,7 @@ private:
     std::string m_directory;
     const std::string m_username;
     const std::string m_machine_name;
+    std::vector<std::string> m_history;
 
     bool m_running = true;
 
