@@ -27,10 +27,8 @@ ErrorCode Cli::run()
     return success();
 }
 
-ErrorCode Cli::execute(const std::string& command)
+ErrorCode Cli::execute(const std::string& command) noexcept
 {
-    m_history.push_back(command);
-
     const std::string& binary = command.substr(0, command.find(' '));
     // Extract arguments.
     std::vector<std::string> args;
@@ -40,27 +38,48 @@ ErrorCode Cli::execute(const std::string& command)
     {
         std::stringstream stream{command.substr(command.find(' '))};
         std::string argument;
+        bool is_first = true;
 
         while (stream.good())
         {
             stream >> argument;
             // Redirect the command output to a file.
-            if (argument == ">")
+            if (!is_first)
             {
-                stream >> argument;
-                return run_to_file(binary, args, argument);
-            }
-            else if (argument == "|")
-            {
-                // Redirect the command output to another command.
-                stream >> argument;
-                return run_to_process(binary, args, argument);
+                if (argument == ">")
+                {
+                    stream >> argument;
+                    // NOTE: you cannot use env variables after `>` or `|`.
+                    if (!resolve_vars(args))
+                    {
+                        return failure();
+                    }
+
+                    return run_to_file(binary, args, argument);
+                }
+                else if (argument == "|")
+                {
+                    // Redirect the command output to another command.
+                    stream >> argument;
+                    // NOTE: you cannot use env variables after `>` or `|`.
+                    if (!resolve_vars(args))
+                    {
+                        return failure();
+                    }
+
+                    return run_to_process(binary, args, argument);
+                }
             }
 
             args.emplace_back(argument);
+            is_first = false;
         }
     }
 
+    if (!resolve_vars(args))
+    {
+        return failure();
+    }
     return run_to_stdout(binary, args);
 }
 
@@ -198,6 +217,50 @@ ErrorCode Cli::run_to_process(const std::string& binary,
     }
 }
 
+bool Cli::resolve_vars(std::vector<std::string>& args) const
+{
+    bool succeded = true;
+    for (auto& arg : args)
+    {
+        if (arg[0] != '$')
+            continue;
+
+        try
+        {
+            arg = m_environment.at(arg);
+        }
+        catch (std::out_of_range& e)
+        {
+            fmt::print("{} is not an environment variable.\n", arg);
+            succeded = false;
+        }
+    }
+
+    return succeded;
+}
+
+std::string Cli::resolve_var(const std::string& variable) const
+{
+    std::string result;
+
+    try
+    {
+        result = m_environment.at(variable);
+    }
+    catch (std::out_of_range& e)
+    {
+        fmt::print("{} is not an environment variable.\n", variable);
+    }
+
+    return result;
+}
+
+void Cli::update_path(const std::string& dir) noexcept
+{
+    m_path.emplace_back(dir);
+    m_environment["$PATH"] = m_environment["$PATH"] + " " + dir;
+}
+
 inline void Cli::print_interface() const
 {
     fmt::print(fmt::emphasis::bold | fg(fmt::color::gold), "{}", m_username);
@@ -208,7 +271,7 @@ inline void Cli::print_interface() const
     fmt::print(" $ ");
 }
 
-ErrorCode Cli::cd(const std::vector<std::string>& args)
+ErrorCode Cli::cd(const std::vector<std::string>& args) noexcept
 {
     if (args.size() != 1)
     {
@@ -250,44 +313,88 @@ ErrorCode Cli::cd(const std::vector<std::string>& args)
     return success();
 }
 
-ErrorCode Cli::exit(const std::vector<std::string>& args)
+ErrorCode Cli::exit([[maybe_unused]] const std::vector<std::string>& args) noexcept
 {
     m_running = false;
     return success();
 }
 
-ErrorCode Cli::clear(const std::vector<std::string>& args)
+ErrorCode Cli::clear([[maybe_unused]] const std::vector<std::string>& args) noexcept
 {
     bp::system("clear");
     return success();
 }
 
-ErrorCode Cli::path(const std::vector<std::string>& args)
+ErrorCode Cli::path(const std::vector<std::string>& args) noexcept
 {
     for (auto& arg : args)
     {
+        // Print the path variable.
+        if (arg == "-s")
+        {
+            for (auto& dir : m_path)
+            {
+                fmt::print("{}\n", dir.string());
+            }
+            return success();
+        }
+
         if (!bf::is_directory(arg))
         {
             fmt::print("{} is not a directory.\n", arg);
             continue;
         }
-        m_path.emplace_back(arg);
+
+        update_path(arg);
     }
 
     return success();
 }
 
-inline ErrorCode success()
+ErrorCode Cli::echo(const std::vector<std::string>& args) noexcept
+{
+    for (auto& arg : args)
+    {
+        if (arg[0] == '$')
+        {
+            std::string result = resolve_var(arg);
+            if (result.empty())
+                return failure();
+            fmt::print("{}", result);
+        }
+        else
+        {
+            fmt::print("{}", arg);
+        }
+    }
+
+    return success();
+}
+
+ErrorCode Cli::export_var(const std::vector<std::string>& args) noexcept
+{
+    if (args.size() != 2)
+    {
+        fmt::print("usage: export [variable name] [variable value]\n");
+        return failure();
+    }
+
+    m_environment.emplace("$" + args[0], args[1]);
+
+    return success();
+}
+
+inline ErrorCode success() noexcept
 {
     return ErrorCode(0, std::generic_category());
 }
 
-inline ErrorCode failure()
+inline ErrorCode failure() noexcept
 {
     return ErrorCode(1, std::generic_category());
 }
 
-inline std::string advance()
+inline std::string advance() noexcept
 {
     std::string command;
     std::getline(std::cin, command);
